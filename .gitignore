@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.so
+.env
+.venv
+env/
+venv/
+.idea/
+.vscode/
+.DS_Store
+db_data/
+firebase_key.json
