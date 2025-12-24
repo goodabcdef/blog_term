@@ -5,10 +5,11 @@ services:
     image: mysql:8.0
     restart: always
     environment:
-      MYSQL_DATABASE: termdb
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-      MYSQL_ROOT_PASSWORD: rootpassword
+      # .env 파일에서 값을 읽어옵니다 (${변수명})
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -28,12 +29,14 @@ services:
     build: .
     restart: always
     ports:
-      - "8080:8080"  # <--- 여기를 8080:8080으로 변경했습니다.
-    environment:
-      DATABASE_URL: mysql+pymysql://user:password@db:3306/termdb
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: secret
-      ALGORITHM: HS256
+      # JCloud 외부 포트:내부 포트
+      - "8080:8080"
+    # env_file을 쓰면 .env의 모든 내용을 컨테이너 안으로 주입합니다.
+    env_file:
+      - .env
+    volumes:
+      # 파이어베이스 키 파일만 컨테이너로 쏙 넣어줌 (보안)
+      - ./firebase_key.json:/app/firebase_key.json
     depends_on:
       db:
         condition: service_healthy
