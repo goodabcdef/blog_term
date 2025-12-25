@@ -8,7 +8,7 @@ import os
 # [수정] Redis 연결 (필수 요건 충족용)
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
-from src.routers import auth, blog, extras
+from src.routers import auth, blog, users, admin, system, features
 
 app = FastAPI(
     title="Term Project Blog API",
@@ -65,7 +65,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router)
 app.include_router(blog.router)
-app.include_router(extras.router)
+app.include_router(users.router)
+app.include_router(admin.router)
+app.include_router(system.router)
+app.include_router(features.router)
 
 # 헬스체크 (Redis 상태도 확인)
 @app.get("/health", status_code=200)

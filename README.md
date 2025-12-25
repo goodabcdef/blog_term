@@ -2,14 +2,15 @@
 
 ## 1. 프로젝트 개요
 본 프로젝트는 대규모 트래픽 처리를 고려하여 설계된 **RESTful 블로그 API 서버**입니다.
-사용자 인증부터 게시글 관리, 소셜 기능(좋아요, 댓글), 그리고 시스템 관리까지 포함된 완전한 백엔드 솔루션을 제공합니다.
+사용자 인증, 게시글 관리, 소셜 인터랙션(좋아요, 댓글), 시스템 관리 기능을 모듈식으로 구현하였으며, **Docker** 기반의 마이크로서비스 아키텍처와 **Redis** 캐싱을 통해 성능을 극대화했습니다.
 
 ### 🎯 주요 기능
-- **고급 인증 시스템:** JWT 기반 Access/Refresh 토큰 처리 및 **Firebase 소셜 로그인** 연동
-- **권한 관리 (RBAC):** 일반 유저(`ROLE_USER`)와 관리자(`ROLE_ADMIN`)의 엄격한 권한 분리
-- **컨텐츠 관리:** 게시글/댓글 CRUD, 태그(Tag) 시스템, 좋아요(Like) 토글
-- **성능 최적화:** **Redis**를 활용한 Global Rate Limiting (DDOS 방지) 및 조회수 캐싱
-- **확장성:** **Docker Compose** 기반의 컨테이너 환경 구성 (App, MySQL, Redis)
+- **고급 인증 시스템:** JWT (Access/Refresh) 토큰 및 **Firebase 소셜 로그인** 연동
+- **권한 관리 (RBAC):** 일반 유저(`ROLE_USER`)와 관리자(`ROLE_ADMIN`)의 철저한 권한 분리
+- **컨텐츠 관리:** 게시글/댓글 CRUD, 태그(Tag) 시스템, 이미지 업로드 시뮬레이션
+- **성능 최적화:** **Redis**를 활용한 Global Rate Limiting (DDoS 방지) 및 조회수 캐싱
+- **자동화 시스템:** GitHub Actions를 통한 **CI(Continuous Integration)** 파이프라인 구축
+- **확장성:** **Docker Compose**를 이용한 App, DB, Redis 컨테이너 오케스트레이션
 
 ---
 
@@ -24,6 +25,7 @@ Docker가 설치된 환경에서는 단 한 줄의 명령어로 DB, Redis, App�
 cp .env.example .env
 
 # 2. 서비스 실행 (빌드 및 데몬 실행)
+# 코드가 수정되었을 경우 --build 옵션을 사용하여 재빌드합니다.
 docker compose up -d --build
 
 # 3. 로그 확인
@@ -35,17 +37,14 @@ Docker 없이 로컬 환경에서 직접 구동하려면 아래 순서를 따릅
 (전제조건: 로컬에 MySQL(3306), Redis(6379)가 실행 중이어야 합니다.)
 
 ```bash
-# 1. 가상환경 생성 및 활성화 (선택)
+# 1. 가상환경 생성 및 활성화
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. 의존성 설치
 pip install -r requirements.txt
 
-# 3. 데이터베이스 마이그레이션 (테이블 생성)
-# (본 프로젝트는 SQLAlchemy가 시작 시 자동으로 테이블을 생성하므로 별도 명령어가 필요 없습니다.)
-
-# 4. 서버 실행
+# 3. 서버 실행
 uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
@@ -66,7 +65,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
 ---
 
 ## 4. 배포 주소 (Deployment)
-현재 JCloud 서버에 배포되어 운영 중입니다.
+현재 JCloud 클라우드 서버에 배포되어 운영 중입니다.
 
 - **Base URL:** `http://113.198.66.68:10235`
 - **Swagger UI (API 문서):** [http://113.198.66.68:10235/swagger-ui](http://113.198.66.68:10235/swagger-ui)
@@ -74,96 +73,96 @@ uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
 
 ---
 
-## 5. 인증 플로우 및 권한 (Auth & RBAC)
+## 5. API 상세 명세 (API Reference)
+본 프로젝트는 **RESTful 원칙**을 준수하며, 기능별로 모듈화된 라우터(`routers/`)를 통해 엔드포인트를 제공합니다.
 
-### 🔐 인증 방식
-1. **일반 로그인:** Email/Password → 서버 검증 → `Access Token` + `Refresh Token` 발급
-2. **소셜 로그인:** Client (Google Login) → Firebase ID Token 획득 → 서버 전송 → 검증 후 자체 JWT 발급
-3. **API 요청:** Header에 `Authorization: Bearer <Access Token>` 포함하여 요청
+### 🔐 1. 인증 (Authentication)
+JWT 토큰 발급 및 보안 관련 기능을 담당합니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/login` | 이메일/비밀번호 로그인 (JWT 발급) | All |
+| `POST` | `/auth/refresh` | 만료된 Access Token 재발급 | All |
+| `POST` | `/auth/google` | Firebase 연동 구글 소셜 로그인 | All |
 
-### 👮‍♂️ 역할 및 권한표
-| API 구분 | ROLE_USER (일반) | ROLE_ADMIN (관리자) |
-|---|---|---|
-| **게시글 조회** | ✅ 전체 가능 | ✅ 전체 가능 |
-| **게시글 작성** | ✅ 본인 글만 | ✅ 전체 가능 |
-| **게시글 삭제** | ✅ 본인 글만 | ✅ **모든 유저의 글 삭제 가능** |
-| **댓글/좋아요** | ✅ 가능 | ✅ 가능 |
-| **관리자 페이지** | ❌ 접근 불가 (`403 Forbidden`) | ✅ 유저 관리, 통계 조회 가능 |
+### 📝 2. 게시글 (Blog Posts)
+핵심 컨텐츠인 게시글을 관리합니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/posts` | 전체 게시글 목록 조회 (페이지네이션) | All |
+| `POST` | `/posts` | 게시글 작성 | User+ |
+| `GET` | `/posts/{id}` | 게시글 상세 조회 | All |
+
+### ❤️ 3. 기능 및 소셜 (Features & Social)
+태그, 좋아요, 댓글 등 부가 기능입니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/features/tags` | 새로운 태그 생성 | User+ |
+| `POST` | `/features/posts/{id}/like` | 좋아요 토글 (Like/Unlike) | User+ |
+| `POST` | `/posts/{id}/comments` | 댓글 작성 | User+ |
+| `PUT` | `/features/comments/{id}` | 댓글 수정 | Owner |
+| `DELETE` | `/features/comments/{id}` | 댓글 삭제 | Owner |
+
+### 👤 4. 사용자 관리 (Users)
+회원 정보 조회 및 개인 설정 관리입니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/users/me` | 내 정보 조회 | User+ |
+| `PUT` | `/users/me/password` | 비밀번호 변경 | User+ |
+| `DELETE` | `/users/me/deactivate` | 회원 탈퇴 | User+ |
+| `GET` | `/users` | 전체 유저 목록 조회 | All |
+
+### 👑 5. 관리자 전용 (Administration)
+관리자(`ROLE_ADMIN`)만 접근 가능한 시스템 관리 기능입니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/admin/stats` | 전체 통계(유저/글/댓글 수) 조회 | **Admin** |
+| `DELETE` | `/admin/users/{id}` | 특정 유저 강제 삭제 | **Admin** |
+| `POST` | `/admin/users/{id}/ban` | 특정 유저 정지 처리 | **Admin** |
+
+### ⚙️ 6. 시스템 (System)
+서버 상태 모니터링 및 유틸리티입니다.
+| Method | Endpoint | 설명 | 권한 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | 서버 및 Redis 연결 상태 점검 (Health Check) | All |
+| `GET` | `/system/time` | 서버 시간 및 버전 정보 확인 | All |
 
 ---
 
 ## 6. 예제 계정 (Test Accounts)
-서버 실행 시 `seed_data.py`에 의해 자동으로 생성되는 테스트 계정입니다.
+서버 초기 구동 시 `seed_data.py`를 통해 생성된 테스트 계정입니다.
 
 ### 👤 일반 사용자 (User)
 - **ID:** `user1@example.com`
 - **PW:** `password123`
-- **설명:** 일반적인 게시글 작성, 수정, 댓글 달기 테스트용
+- **Role:** `ROLE_USER`
 
 ### 👑 관리자 (Admin)
 - **ID:** `user0@example.com`
 - **PW:** `password123`
-- **설명:** `/admin` 엔드포인트 접근 및 강제 삭제 권한 테스트용
+- **Role:** `ROLE_ADMIN` (관리자 페이지 접근 가능)
 
 ---
 
-## 7. DB 연결 정보 (테스트용)
-채점 및 테스트를 위해 DB에 직접 접속해야 할 경우 아래 정보를 사용하십시오.
+## 7. 성능 및 보안 아키텍처
 
-- **Host:** `113.198.66.68`
-- **Port:** `3306` (Docker 내부), 외부 접속 시 포트 확인 필요
-- **Database:** `termdb`
-- **User:** `root` (관리자) / `user` (앱 전용)
-- **Password:** `rootpassword` / `password`
+### 🚀 Performance
+1.  **Redis Caching:** 조회수 증가 로직과 세션 관리에 In-Memory DB인 Redis를 사용하여 DB 부하 최소화.
+2.  **Eager Loading:** SQLAlchemy의 `joinedload`를 사용하여 N+1 쿼리 문제 원천 차단.
+3.  **Connection Pooling:** DB 연결을 효율적으로 재사용하여 대량의 요청 처리 가능.
 
----
-
-## 8. 엔드포인트 요약
-
-| Method | Endpoint | 설명 | 권한 |
-|---|---|---|---|
-| `POST` | `/auth/login` | 일반 로그인 (JWT 발급) | Any |
-| `POST` | `/auth/refresh` | 토큰 갱신 | Any |
-| `GET` | `/posts` | 게시글 목록 (페이지네이션) | Any |
-| `POST` | `/posts` | 게시글 작성 | User+ |
-| `POST` | `/posts/{id}/like` | 게시글 좋아요 토글 | User+ |
-| `GET` | `/admin/stats` | 전체 통계 조회 | **Admin** |
-| `GET` | `/health` | 서버 상태 확인 | Any |
-
-*(전체 API 명세는 Swagger UI를 참고해주세요)*
+### 🛡️ Security
+1.  **Rate Limiting:** 특정 IP의 과도한 요청을 Redis 기반으로 차단하여 DDoS 공격 방어.
+2.  **Secure Password:** `bcrypt` 알고리즘을 사용하여 비밀번호를 단방향 암호화하여 저장.
+3.  **Input Validation:** Pydantic을 활용한 엄격한 데이터 타입 검증으로 SQL Injection 방지.
 
 ---
 
-## 9. 성능 및 보안 고려사항
+## 8. CI/CD 자동화 (Bonus)
+안정적인 배포를 위해 **GitHub Actions**를 활용한 CI 파이프라인을 구축하였습니다.
 
-### 🚀 성능 (Performance)
-1. **Redis Caching:** 반복적인 DB 부하를 줄이기 위해 세션 및 조회수 로직에 Redis 적용
-2. **Eager Loading:** SQLAlchemy의 `joinedload`를 사용하여 N+1 쿼리 문제 해결
-3. **Pagination:** 대량의 데이터 조회 시 `offset/limit` 기반 페이지네이션 적용
-
-### 🛡️ 보안 (Security)
-1. **Rate Limiting:** Redis 기반의 미들웨어를 적용하여 특정 IP의 과도한 요청 차단 (DDoS 방어)
-2. **Password Hashing:** `bcrypt` 알고리즘을 사용하여 비밀번호를 안전하게 암호화 저장
-3. **Input Validation:** Pydantic을 사용하여 모든 입력값의 타입과 형식을 엄격하게 검증
-
----
-
-## 10. 한계와 개선 계획
-- **검색 기능:** 현재 MySQL `LIKE` 쿼리를 사용 중이나, 추후 **Elasticsearch**를 도입하여 전문 검색(Full-text Search) 성능을 개선할 계획입니다.
-- **HTTPS 적용:** 현재 HTTP로 통신 중이나, 실서비스 배포 시 **SSL 인증서(Let's Encrypt)**를 적용하여 통신 보안을 강화할 예정입니다.
-
----
-
-## 11. 가점 항목 구현 (Bonus Features)
-
-### 🔄 CI/CD Pipeline (GitHub Actions)
-안정적인 개발 및 배포를 위해 **GitHub Actions**를 활용한 CI(Continuous Integration) 파이프라인을 구축하였습니다.
-
-- **기능:** 코드가 `main` 브랜치에 Push 되거나 Pull Request가 생성될 때마다 자동 실행
-- **워크플로우 프로세스:**
-    1. **Environment:** Ubuntu-latest 환경에서 실행
-    2. **Services:** 테스트를 위해 격리된 MySQL 8.0 및 Redis 컨테이너 자동 구동
-    3. **Install:** Python 3.10 환경 설정 및 `requirements.txt` 의존성 설치
-    4. **Test:** 빌드 검증 및 테스트 스크립트 실행
-- **설정 파일 위치:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-- **확인 방법:** GitHub 저장소 상단의 **[Actions]** 탭에서 `CI (Build & Test)` 워크플로우의 성공 내역(✅)을 확인할 수 있습니다.
+- **워크플로우:** 코드가 Push되거나 PR이 생성되면 자동으로 실행.
+- **주요 작업:**
+    1. Python 3.10 환경 설정 및 의존성 설치
+    2. **MySQL 8.0 & Redis 컨테이너** 자동 구동 (테스트 환경)
+    3. 빌드 검증 및 `pytest` 자동 실행
+- **확인 방법:** GitHub 저장소 상단의 **[Actions]** 탭에서 `CI (Build & Test)` 성공 내역(✅) 확인 가능.
